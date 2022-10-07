@@ -26,7 +26,7 @@ services:
     ports:
       - 8080:80
     volumes:
-      - "./phpmyadmin/sessions:/sessions"
+      - "./docker/phpmyadmin/sessions:/sessions"
       - "./docker/phpmyadmin/config.inc.php:/etc/phpmyadmin/config.inc.php"
     depends_on:
       - db
