@@ -1,16 +1,32 @@
-version: "3"
+version: '3'
 
 services:
   db:
-    build:
-      context: .
-      dockerfile: docker/db/Dockerfile
+    build: ./docker/db
     container_name: db
+    environment:
+      MYSQL_ROOT_PASSWORD: "pass"
+      TZ: "Asia/Tokyo"
     ports:
-      - "53306:3306"
+      - 3306:3306
     volumes:
-      - ./docker/db/my.cnf:/etc/mysql/my.cnf
-      - ./docker/db/mysql_data:/var/lib/mysql
+      - "./docker/db/mysql_data:/var/lib/mysql"
       - "./docker/db/init:/docker-entrypoint-initdb.d"
-    env_file:
-      - ./docker/db/db-variables.env
+      - "./docker/db/my.cnf:/etc/mysql/conf.d/my.cnf"
+    restart: always
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOSTS=db
+      - PMA_USER=root
+      - PMA_PASSWORD=pass
+    ports:
+      - 8080:80
+    volumes:
+      - "./phpmyadmin/sessions:/sessions"
+      - "./docker/phpmyadmin/config.inc.php:/etc/phpmyadmin/config.inc.php"
+    depends_on:
+      - db
