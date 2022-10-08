@@ -64,3 +64,38 @@ SUM(sa.payment) OVER(PARTITION BY sa.paid_date ORDER BY emp.id)
 FROM employees AS emp
 INNER JOIN salaries AS sa
 ON emp.id = sa.employee_id;
+
+
+-- salesテーブルのorder_price * order_amountの合計の７日間の平均を求める
+-- まずは、日付毎の合計値を求める
+-- 7日平均を求める
+SELECT *,
+SUM(order_price * order_amount) OVER(ORDER BY order_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)
+FROM orders;
+
+WITH daily_summary AS (
+SELECT
+  order_date, SUM(order_price * order_amount) AS sale
+FROM
+  orders
+GROUP BY order_date
+)
+SELECT
+  *,
+  AVG(sale) OVER(ORDER BY order_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) -- 6行前から現在の行まで
+FROM
+  daily_summary;
+
+
+SELECT
+*,
+SUM(summary_salary.payment)
+OVER(ORDER BY age RANGE BETWEEN 3 PRECEDING AND CURRENT ROW) AS p_summary
+FROM employees AS emp
+INNER JOIN
+(SELECT
+  employee_id,
+  SUM(payment) AS payment
+FROM salaries
+  GROUP BY employee_id) AS summary_salary
+ON emp.id = summary_salary.employee_id;
