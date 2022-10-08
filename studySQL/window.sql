@@ -99,3 +99,48 @@ INNER JOIN
 FROM salaries
   GROUP BY employee_id) AS summary_salary
 ON emp.id = summary_salary.employee_id;
+
+
+/* ウィンドゥ関数一覧 */
+-- ROW_NUMBER, RANK, DESEN_RANK
+
+SELECT
+*,
+ROW_NUMBER() OVER(ORDER BY age) AS row_num,
+RANK() OVER(ORDER BY age) AS row_rank,
+DENSE_RANK() OVER(ORDER BY age) AS row_dense
+FROM employees;
+
+-- CUME_DIST, PERCENT_RANK
+SELECT
+age,
+RANK() OVER(ORDER BY age) AS row_rank,
+COUNT(*) OVER() AS cnt, -- 行数
+PERCENT_RANK() OVER(ORDER BY age) AS p_age, -- RANK -1 / (行数)
+CUME_DIST() OVER(ORDER BY age) AS c_age -- 現在の行の値より小さい行の割合
+FROM employees;
+
+
+-- LAG, LEAD
+SELECT
+age,
+LAG(age) OVER(ORDER BY age), -- 直前
+LAG(age, 3, 0) OVER(ORDER BY age), -- ３つ前、ない場合は0
+LEAD(age) OVER(ORDER BY age), -- 直後
+LEAD(age, 2, 0) OVER(ORDER BY age) -- ２つ後、ない場合は0
+FROM customers;
+
+-- FARST_VALUE, LAST_VALUE
+
+SELECT
+*,
+FIRST_VALUE(first_name) OVER(PARTITION BY department_id ORDER BY age),
+LAST_VALUE(first_name) OVER(PARTITION BY department_id ORDER BY age RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+FROM employees;
+
+-- TILE
+SELECT
+age,
+NTILE(10) OVER(ORDER BY age)
+FROM
+employees;
