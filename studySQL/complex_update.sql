@@ -76,3 +76,24 @@ WHERE department_id IN(
 )
 
 
+/* INNSERT処理の応用 */
+SELECT * FROM customers
+
+SELECT * FROM orders;
+
+CREATE TABLE customer_orders(
+  name VARCHAR(255),
+  order_date DATE,
+  sales INT,
+  total_sales INT
+);
+
+INSERT INTO customer_orders
+SELECT
+  CONCAT(ct.first_name, ct.last_name),
+  od.order_date,
+  od.order_amount * od.order_price,
+  SUM(od.order_amount * od.order_price) OVER(PARTITION BY CONCAT(ct.first_name, ct.last_name) ORDER BY order_date)
+FROM customers AS ct
+INNER JOIN orders AS od
+ON ct.id = od.customer_id
