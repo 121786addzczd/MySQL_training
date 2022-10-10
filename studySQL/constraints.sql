@@ -155,3 +155,59 @@ INSERT INTO students VALUES(1, "Taro", 17, 1);
 SELECT * FROM students;
 -- SET DEFAULTの場合UPDATEできない
 UPDATE schools SET id = 3 WHERE id = 1;
+
+
+
+/* ALTER TABLEで制約を後から追加する */
+/*---------------------------------------------------------------------
+■UNIQUE制約を追加する
+・書式
+```
+ALTER TABLE table_name
+ADD [CONSTRAINT constraint_name] UNIQUE (column1, columun2, .....);
+```
+
+■制約を削除する
+・書式
+```
+ALTER TABLE table_name DROP CONSTRAINT constraint_name;
+```
+
+■特定のテーブルの制約一覧を表示する
+・書式
+```
+SELECT column_name, constraint_name, referenced_column_name,
+referenced_table_name
+FROM information_schrma.key_column_usage
+WHERE table_name = 'TableName';
+```
+-----------------------------------------------------------------------*/
+
+SELECT * FROM employees;
+
+UPDATE employees SET name = "Jiro" WHERE employee_code ="00000002";
+
+DESCRIBE employees;
+
+-- uniqueの追加
+ALTER TABLE employees ADD CONSTRAINT uniq_employees_name UNIQUE(name); -- 後から一意制約つける
+
+-- 制約一覧を確認
+SELECT
+*
+FROM information_schema.key_column_usage
+WHERE
+  table_name = "employees";
+
+-- 制約の削除
+ALTER TABLE employees DROP CONSTRAINT uniq_employees_name;
+
+-- uniqueの追加
+ALTER TABLE employees ADD CONSTRAINT uniq_employees_name UNIQUE(name, age);
+
+SELECT * FROM employees;
+-- nameとage同じ値が登録されているためINSERT失敗
+INSERT INTO employees VALUES(2, "00000003", "Taro", 19);
+
+-- このテーブルのCREATE分を確認することができる
+SHOW CREATE TABLE employees;
