@@ -211,3 +211,90 @@ INSERT INTO employees VALUES(2, "00000003", "Taro", 19);
 
 -- このテーブルのCREATE分を確認することができる
 SHOW CREATE TABLE employees;
+
+
+/* 制約の追加(DEFAULT, CHECK, NOT NULL, 主キー, 外部キー) */
+/*---------------------------------------------------------------------
+■DEFAULTを追加する
+ALTER TABLEとSET DEFAULTでデフォルト値を設定する
+・書式
+```
+ALTER TABLE table_name
+ALTER column_name SET DEFAULT default_value;
+```
+
+■NOTNULLを追加する
+・書式
+```
+ALTER TABLEとMODIFYでNOT NULLを設定する
+ALTER TABLE products MODIFY stocks INT NOT NULL
+```
+
+■CHECK制約を追加する
+・書式
+```
+ALTER TABLE users ADD CONSTRAINT check_age CHECK (age >= 0);
+```
+-----------------------------------------------------------------------*/
+
+-- DEFAULT追加
+SELECT * FROM customers;
+
+SHOW CREATE TABLE custmoers;
+
+ALTER TABLE customers DROP CONSTRAINT custmers_chk_1;
+
+DESCRIBE customers;
+
+ALTER TABLE custmoers
+ALTER age SET DEFAULT 20;
+
+INSERT INTO customers(id, name) VALUES(2, "Jiro");
+
+SELECT * FROM customers;
+
+-- NOT NULLの追加
+ALTER TABLE customers MODIFY name VARCHAR(255) NOT NULL;
+
+INSERT INTO customers(id, name) VALUES(3, NULL);
+
+-- CHECK 制約の追加
+ALTER TABLE customers ADD CONSTRAINT check_age CHECK(age >= 20);
+
+/*---------------------------------------------------------------------
+
+■主キーを追加する
+・書式
+```
+ALTER TABLE persons
+ADD CONSTRAINT pk_person PRIMARY KEY(id, last_name);
+```
+
+■外部キーを追加する
+・書式
+```
+ALTER TABLE users
+ADD CONSTRAINT fk_grade_id
+FOREIGN KEY (grade_id) REFERENCES grades(id);
+```
+
+-----------------------------------------------------------------------*/
+
+DESCRIBE customers;
+
+ALTER TABLE customers DROP PRIMARY KEY;
+
+-- 主キーを追加
+ALTER TABLE customers
+ADD CONSTRAINT pk_customers PRIMARY KEY(id);
+
+-- 外部キー
+DESCRIBE students;
+
+SHOW CREATE TABLE students;
+
+ALTER TABLE students DROP CONSTRAINT students_ibfk_1;
+
+ALTER TABLE students
+ADD CONSTRAINT fk_schools_students
+FOREIGN KEY(school_id) REFERENCES schools(id);
