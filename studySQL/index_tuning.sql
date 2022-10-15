@@ -157,7 +157,7 @@ DROP INDEX idx_customers_orefecture_code ON customers;
 
 
 
-/* SQLチューニング インデックスが利用されないパターン */
+/* SQLチューニング インデックスが利用されないパターン1 */
 -- INDEXなし
 SELECT * FROM customers WHERE UPPER(first_name) = "JOSEPH";
 
@@ -199,3 +199,50 @@ EXPLAIN ANALYZE SELECT * FROM customers WHERE age +2 = 27;
     -> Table scan on customers  (cost=50435.30 rows=496903) (actual time=0.096..7815.364 rows=500000 loops=1)
 
 */
+
+
+
+/* SQLチューニング インデックスが利用されないパターン2 */
+-- 文字列と数値の比較
+CREATE INDEX idx_customers_prefecture_code ON customers(prefecture_code);
+EXPLAIN ANALYZE SELECT * FROM customers WHERE prefecture_code = 21;
+/* INDEX貼ってもフルスキャン prefecture_codeは文字列型
+-> Filter: (customers.prefecture_code = 21)  (cost=50435.30 rows=49690) (actual time=0.343..13384.904 rows=12192 loops=1)
+    -> Table scan on customers  (cost=50435.30 rows=496903) (actual time=0.074..6921.408 rows=500000 loops=1)
+*/
+DESCRIBE customers;
+-- シングルクォートで囲む
+EXPLAIN ANALYZE SELECT * FROM customers WHERE prefecture_code = '21';
+/*
+-> Index lookup on customers using idx_customers_prefecture_code (prefecture_code='21'), with index condition: (customers.prefecture_code = '21')  (cost=4429.20 rows=21942) (actual time=3.433..860.693 rows=12192 loops=1)
+*/
+
+-- 前方一致、中間一致、後方一致
+CREATE INDEX idx_customers_first_name ON customers(first_name);
+EXPLAIN ANALYZE SELECT * FROM customers WHERE first_name LIKE 'Jo%'
+/*
+-> Index range scan on customers using idx_customers_first_namee, with index condition: (customers.first_name like 'Jo%')  (cost=23498.36 rows=52218) (actual time=4.596..653.827 rows=24521 loops=1)
+*/
+
+-- 後方一致はフルスキャン
+EXPLAIN ANALYZE SELECT * FROM customers WHERE first_name LIKE '%A'
+/*
+-> Filter: (customers.first_name like '%A')  (cost=50435.30 rows=55206) (actual time=0.638..15061.219 rows=92504 loops=1)
+    -> Table scan on customers  (cost=50435.30 rows=496903) (actual time=0.144..7029.806 rows=500000 loops=1)
+*/
+
+-- 中間一致はフルスキャン
+
+-- first_nameにJoを含む人の最初の50000件
+EXPLAIN ANALYZE SELECT * FROM customers WHERE first_name LIKE '%Jo%' LIMIT 50000; -- 6567ms
+
+-- customersから5000件取ってきたうちfirst_nameにJoを含む人
+EXPLAIN ANALYZE SELECT * FROM (SELECT * FROM customers LIMIT 50000) AS tmp WHERE first_name LIKE '%Jo%'; -- 3847ms
+
+SHOW INDEX FROM customers;
+
+DROP INDEX idx_customers_age ON customers;
+
+DROP INDEX idx_customers_prefecture_code ON customers;
+
+DROP INDEX idx_customers_first_name ON customers;
