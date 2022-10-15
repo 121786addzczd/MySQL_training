@@ -154,3 +154,48 @@ ON pr.prefecture_code = ct.prefecture_code AND pr.name = "北海道";
 
 DROP INDEX idx_customers_orefecture_code ON customers;
 
+
+
+
+/* SQLチューニング インデックスが利用されないパターン */
+-- INDEXなし
+SELECT * FROM customers WHERE UPPER(first_name) = "JOSEPH";
+
+-- INDEX追加
+CREATE INDEX idx_customers_first_name ON customers(first_name);
+
+-- インデックス追加してもテーブルスキャンで速くならない
+EXPLAIN ANALYZE SELECT * FROM customers WHERE UPPER(first_name) = "JOSEPH";
+/*
+-> Filter: (upper(customers.first_name) = 'JOSEPH')  (cost=50479.50 rows=497345) (actual time=0.362..12999.586 rows=4712 loops=1)
+    -> Table scan on customers  (cost=50479.50 rows=497345) (actual time=0.120..6523.982 rows=500000 loops=1)
+
+*/
+
+-- 関数を実行して結果に対してINDEXつける
+CREATE INDEX idex_customers_lower_first_name ON customers((UPPER(first_name)));
+EXPLAIN ANALYZE SELECT * FROM customers WHERE UPPER(first_name) = "JOSEPH"; -- 関数INDEXは最終手段と考える
+/*
+-> Index lookup on customers using idex_customers_lower_first_name (upper(first_name)='JOSEPH')  (cost=1649.20 rows=4712) (actual time=2.153..101.477 rows=4712 loops=1)
+*/
+
+-- UPPER関数使わない検索パターン
+EXPLAIN ANALYZE SELECT * FROM customers WHERE first_name  IN("joseph", "joseph", "JOSEPH");
+
+DROP INDEX idx_customers_first_name ON customers;
+DROP INDEX idex_customers_lower_first_name ON customers;
+
+
+CREATE INDEX idx_customers_age ON customers(age);
+EXPLAIN ANALYZE SELECT * FROM customers WHERE age = 25;
+/*
+-> Index lookup on customers using idx_customers_age (age=25)  (cost=3263.60 rows=10286) (actual time=4.085..281.542 rows=10286 loops=1)
+*/
+
+-- フルスキャンにななる
+EXPLAIN ANALYZE SELECT * FROM customers WHERE age +2 = 27;
+/*
+-> Filter: ((customers.age + 2) = 27)  (cost=50435.30 rows=496903) (actual time=6.111..14881.254 rows=10286 loops=1)
+    -> Table scan on customers  (cost=50435.30 rows=496903) (actual time=0.096..7815.364 rows=500000 loops=1)
+
+*/
