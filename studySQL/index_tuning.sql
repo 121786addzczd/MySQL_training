@@ -246,3 +246,96 @@ DROP INDEX idx_customers_age ON customers;
 DROP INDEX idx_customers_prefecture_code ON customers;
 
 DROP INDEX idx_customers_first_name ON customers;
+
+
+-- 無駄なグループBY
+EXPLAIN ANALYZE
+SELECT
+age, COUNT(*)
+FROM customers
+GROUP BY age
+HAVING age < 30;
+/*
+-> Filter: (customers.age < 30)  (actual time=14747.299..14749.407 rows=8 loops=1)
+    -> Table scan on <temporary>  (actual time=0.021..0.747 rows=49 loops=1)
+        -> Aggregate using temporary table  (actual time=14746.982..14748.787 rows=49 loops=1)
+            -> Table scan on customers  (cost=50435.30 rows=496903) (actual time=0.075..6994.830 rows=500000 loops=1)
+*/
+
+CREATE INDEX idx_customers_age ON customers(age);
+EXPLAIN ANALYZE
+SELECT
+age, COUNT(*)
+FROM customers
+WHERE age < 30
+GROUP BY age;  -- GROUP BY はHAVINGで絞り込むのではなくWHEREで絞り込んでからGROUP BY
+/*
+-> Group aggregate: count(0)  (actual time=413.431..3431.150 rows=8 loops=1)
+    -> Filter: (customers.age < 30)  (cost=32491.42 rows=161958) (actual time=0.132..2598.526 rows=82096 loops=1)
+        -> Index range scan on customers using idx_customers_age  (cost=32491.42 rows=161958) (actual time=0.078..949.537 rows=82096 loops=1)
+*/
+
+-- MAX, MINはインデックスを利用することができる。AVG,SUMはフルスキャン
+EXPLAIN ANALYZE SELECT MAX(age), MIN(age), AVG(age), SUM(age) FROM customers;
+/*
+-> Aggregate: avg(customers.age), sum(customers.age)  (actual time=11988.243..11988.262 rows=1 loops=1)
+    -> Index scan on customers using idx_customers_age  (cost=50435.30 rows=496903) (actual time=0.052..5997.371 rows=500000 loops=1)
+*/
+
+-- DISTINCTの代わりにEXISTS
+
+-- DISTINCTの場合
+EXPLAIN ANALYZE SELECT DISTINCT pr.name FROM prefectures AS pr
+INNER JOIN customers AS ct
+ON pr.prefecture_code = ct.prefecture_code;
+/*
+-> Table scan on <temporary>  (actual time=0.021..0.434 rows=41 loops=1)
+    -> Temporary table with deduplication  (cost=224351.35 rows=496903) (actual time=85763.006..85764.227 rows=41 loops=1)
+        -> Nested loop inner join  (cost=224351.35 rows=496903) (actual time=0.193..77109.164 rows=500000 loops=1)
+            -> Filter: (ct.prefecture_code is not null)  (cost=50435.30 rows=496903) (actual time=0.102..20494.424 rows=500000 loops=1)
+                -> Table scan on ct  (cost=50435.30 rows=496903) (actual time=0.060..7219.070 rows=500000 loops=1)
+            -> Single-row index lookup on pr using PRIMARY (prefecture_code=ct.prefecture_code)  (cost=0.25 rows=1) (actual time=0.034..0.047 rows=1 loops=500000)
+*/
+
+-- EXISTS
+EXPLAIN ANALYZE
+SELECT name FROM prefectures AS pr
+WHERE EXISTS(
+  SELECT 1 FROM customers AS ct WHERE ct.prefecture_code = pr.prefecture_code
+);
+/* 多少速くなる
+-> Nested loop inner join  (cost=2335453.75 rows=23354441) (actual time=34833.717..34845.984 rows=41 loops=1)
+    -> Table scan on pr  (cost=4.95 rows=47) (actual time=0.102..0.915 rows=47 loops=1)
+    -> Single-row index lookup on <subquery2> using <auto_distinct_key> (prefecture_code=pr.prefecture_code)  (actual time=0.037..0.049 rows=1 loops=47)
+        -> Materialize with deduplication  (cost=50435.30 rows=496903) (actual time=741.248..741.286 rows=1 loops=47)
+            -> Filter: (ct.prefecture_code is not null)  (cost=50435.30 rows=496903) (actual time=0.139..25109.378 rows=500000 loops=1)
+                -> Table scan on ct  (cost=50435.30 rows=496903) (actual time=0.076..8775.839 rows=500000 loops=1)
+*/
+
+-- UNION → UNION ALL
+EXPLAIN ANALYZE
+SELECT * FROM customers WHERE age < 30
+UNION
+SELECT * FROM customers WHERE age > 50;
+/*
+-> Table scan on <union temporary>  (cost=2.50 rows=0) (actual time=0.040..4438.193 rows=286055 loops=1)
+    -> Union materialize with deduplication  (actual time=61101.642..73939.163 rows=286055 loops=1)
+        -> Filter: (customers.age < 30)  (cost=50435.30 rows=161958) (actual time=0.337..26669.255 rows=82096 loops=1)
+            -> Table scan on customers  (cost=50435.30 rows=496903) (actual time=0.105..12850.228 rows=500000 loops=1)
+        -> Filter: (customers.age > 50)  (cost=50435.30 rows=248451) (actual time=0.528..24641.854 rows=203959 loops=1)
+            -> Table scan on customers  (cost=50435.30 rows=496903) (actual time=0.387..10779.922 rows=500000 loops=1)
+*/
+
+EXPLAIN ANALYZE
+SELECT * FROM customers WHERE age < 30
+UNION ALL
+SELECT * FROM customers WHERE age > 50;
+/*
+-> Append  (actual time=0.662..78914.717 rows=286055 loops=1)
+    -> Stream results  (cost=50435.30 rows=161958) (actual time=0.380..26936.018 rows=82096 loops=1)
+        -> Filter: (customers.age < 30)  (cost=50435.30 rows=161958) (actual time=0.305..23311.384 rows=82096 loops=1)
+            -> Table scan on customers  (cost=50435.30 rows=496903) (actual time=0.112..11318.479 rows=500000 loops=1)
+    -> Stream results  (cost=50435.30 rows=248451) (actual time=0.213..39722.740 rows=203959 loops=1)
+        -> Filter: (customers.age > 50)  (cost=50435.30 rows=248451) (actual time=0.161..29304.303 rows=203959 loops=1)
+            -> Table scan on customers  (cost=50435.30 rows=496903) (actual time=0.083..12817.229 rows=500000 loops=1)
+*/
