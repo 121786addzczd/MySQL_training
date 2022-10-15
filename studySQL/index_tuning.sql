@@ -64,4 +64,93 @@ EXPLAIN ANALYZE SELECT * FROM customers WHERE first_name = "Olivia" OR age = 42;
 */
 
 
+/* INDEXを使ったORDER BY GRUOP BY */
+
+-- ORDER BY, GROUP BY　時間かかる。実行前にWHEREで絞り込む
+DROP INDEX idx_customers_first_name_age ON customers;
+
+EXPLAIN ANALYZE SELECT * FROM customers ORDER BY first_name;
+/*
+-> Sort: customers.first_name  (cost=50479.50 rows=497345) (actual time=12160.109..16840.792 rows=500000 loops=1)
+    -> Table scan on customers  (cost=50479.50 rows=497345) (actual time=0.091..4937.755 rows=500000 loops=1)
+*/
+
+CREATE INDEX idx_customers_first_namee ON customers(first_name);
+
+-- INDEXあり
+EXPLAIN ANALYZE SELECT * FROM customers ORDER BY first_name;
+/*
+-> Sort: customers.first_name  (cost=50479.50 rows=497345) (actual time=12138.105..17437.105 rows=500000 loops=1)↵    -> Table scan on customers  (cost=50479.50 rows=497345) (actual time=0.348..5848.076 rows=500000 loops=1)↵
+*/
+
+-- 一意のカラムに対しては速度早い
+EXPLAIN ANALYZE SELECT * FROM customers ORDER BY id;
+
+-- GROUP BY
+EXPLAIN ANALYZE SELECT first_name, COUNT(*) FROM customers GROUP BY first_name;
+/*
+-> Group aggregate: count(0)  (actual time=73.678..11123.337 rows=690 loops=1)
+    -> Index scan on customers using idx_customers_first_namee  (cost=50479.50 rows=497345) (actual time=10.313..5634.825 rows=500000 loops=1)
+*/
+
+CREATE INDEX idx_customers_age ON customers(age);
+
+EXPLAIN ANALYZE SELECT age, COUNT(*) FROM customers GROUP BY age;
+/*
+-> Group aggregate: count(0)  (actual time=258.007..10787.539 rows=49 loops=1)
+    -> Index scan on customers using idx_customers_age  (cost=50479.50 rows=497345) (actual time=0.097..5609.024 rows=500000 loops=1)
+*/
+
+DROP INDEX idx_customers_first_name ON customers;
+
+DROP INDEX idx_customers_age ON customers;
+
+-- 複数のGROUP BY
+-- INDEXなしの場合
+EXPLAIN ANALYZE SELECT first_name, age, COUNT(*) FROM customers GROUP By first_name, age;
+/*
+-> Table scan on <temporary>  (actual time=0.023..408.164 rows=32369 loops=1)
+    -> Aggregate using temporary table  (actual time=16278.759..17445.585 rows=32369 loops=1)
+        -> Table scan on customers  (cost=50479.50 rows=497345) (actual time=0.089..6781.808 rows=500000 loops=1)
+
+*/
+
+CREATE INDEX idx_customers_first_name_age ON customers(first_name, age);
+-- INDEX貼った場合
+EXPLAIN ANALYZE SELECT first_name, age, COUNT(*) FROM customers GROUP By first_name, age;
+/*
+-> Group aggregate: count(0)  (actual time=1.087..14674.021 rows=32369 loops=1)
+    -> Index scan on customers using idx_customers_first_name_age  (cost=50479.50 rows=497345) (actual time=0.069..7193.942 rows=500000 loops=1)
+*/
+
+DROP INDEX idx_customers_first_name_age ON customers;
+
+-- 外部キーにインデックスを貼る
+-- インデックスを貼っていない場合の
+EXPLAIN ANALYZE SELECT * FROM prefectures AS pr
+INNER JOIN customers AS ct
+ON pr.prefecture_code = ct.prefecture_code AND pr.name = "北海道";
+
+/* フルスキャン
+-> Nested loop inner join  (cost=224550.25 rows=49735) (actual time=3.958..113780.275 rows=12321 loops=1)
+    -> Filter: (ct.prefecture_code is not null)  (cost=50479.50 rows=497345) (actual time=0.535..23375.172 rows=500000 loops=1)
+        -> Table scan on ct  (cost=50479.50 rows=497345) (actual time=0.414..8555.998 rows=500000 loops=1)
+    -> Filter: (pr.`name` = '北海道')  (cost=0.25 rows=0) (actual time=0.135..0.136 rows=0 loops=500000)
+        -> Single-row index lookup on pr using PRIMARY (prefecture_code=ct.prefecture_code)  (cost=0.25 rows=1) (actual time=0.045..0.060 rows=1 loops=500000)
+*/
+
+CREATE INDEX idx_customers_orefecture_code ON customers(prefecture_code);
+
+-- インデックスを貼った後
+EXPLAIN ANALYZE SELECT * FROM prefectures AS pr
+INNER JOIN customers AS ct
+ON pr.prefecture_code = ct.prefecture_code AND pr.name = "北海道";
+/* 外部キーにindexを貼ると速くなる
+-> Nested loop inner join  (cost=16503.09 rows=59936) (actual time=7.241..556.836 rows=12321 loops=1)
+    -> Filter: (pr.`name` = '北海道')  (cost=4.95 rows=5) (actual time=3.056..4.089 rows=1 loops=1)
+        -> Table scan on pr  (cost=4.95 rows=47) (actual time=2.980..3.553 rows=47 loops=1)
+    -> Index lookup on ct using idx_customers_orefecture_code (prefecture_code=pr.prefecture_code)  (cost=2506.33 rows=12752) (actual time=4.092..292.653 rows=12321 loops=1)
+*/
+
+DROP INDEX idx_customers_orefecture_code ON customers;
 
